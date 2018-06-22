@@ -35,11 +35,6 @@ class ViewController: UIViewController {
         tableView.dataSource = self
     }
     
-    func initDragLikeAnimator(with button: UIButton) {
-        dragLikeAnimator = UIViewPropertyAnimator(duration: likeAnimatorDuration, curve: .easeInOut, animations: {
-            
-        })
-    }
 
 }
 
