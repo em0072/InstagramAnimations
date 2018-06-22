@@ -11,6 +11,10 @@ import UIKit
 protocol CellActionsProtocol: class {
     func longPressActionDidStart(on avatarImageView: UIImageView)
     func longPressActionDidStop(on avatarImageView: UIImageView)
+    func panActionDidStart(on likeButton: UIButton)
+    func panActionDidMove(_ likeButton: UIButton, to position: CGPoint, target: UIImageView)
+    func panActionDidStop(on likeButton: UIButton, target: UIImageView, at row: Int)
+
 }
 
 class TableViewCell: UITableViewCell {
@@ -26,6 +30,7 @@ class TableViewCell: UITableViewCell {
         super.awakeFromNib()
         selectionStyle = .none
         addAvatarLongPress()
+        addPanGesture()
     }
 
     override func layoutSubviews() {
@@ -59,5 +64,29 @@ class TableViewCell: UITableViewCell {
         }
     }
     
+    private func addPanGesture() {
+        // 1. Create pan gesture
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(self.likePanAction(_:)))
+        // 2. Add pan gesture to likeButton
+        likeButton.addGestureRecognizer(pan)
+    }
 
+    @objc private func likePanAction(_ pan: UIPanGestureRecognizer) {
+        switch pan.state {
+        case .began:
+            // 1. Call delegate method
+            delegate?.panActionDidStart(on: likeButton)
+        case .changed:
+            // 2. Calculate new target position of likeButton on every pan gesture change
+            let translation = pan.translation(in: self)
+            let newPosition = CGPoint(x: likeButton.center.x + translation.x,
+                                      y: likeButton.center.y + translation.y)
+            delegate?.panActionDidMove(likeButton, to: newPosition, target: photoImageView)
+        case .ended, .cancelled, .failed:
+            // 3. Call delegate method
+            delegate?.panActionDidStop(on: likeButton, target: photoImageView, at: rowNumber)
+        default:
+            break
+        }
+    }
 }

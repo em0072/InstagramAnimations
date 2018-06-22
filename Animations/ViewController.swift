@@ -13,6 +13,7 @@ class ViewController: UIViewController {
     @IBOutlet weak var tableView: UITableView!
     
     let animationDuration: TimeInterval = 0.3
+    let likeAnimatorDuration: TimeInterval = 0.5
 
     var tableViewDataSource: TableViewDataSource!
     
@@ -24,6 +25,11 @@ class ViewController: UIViewController {
         return view
     }()
     
+    // Like Animation Properties
+    var dragLikeAnimator: UIViewPropertyAnimator?
+    var copiedLikeButton: UIButton?
+
+    var dragLikeCompletionPercent: CGFloat = 0.5
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -35,6 +41,11 @@ class ViewController: UIViewController {
         tableView.dataSource = self
     }
     
+    func initDragLikeAnimator(with button: UIButton) {
+        dragLikeAnimator = UIViewPropertyAnimator(duration: likeAnimatorDuration, curve: .easeInOut, animations: {
+            
+        })
+    }
 
 }
 
@@ -124,5 +135,73 @@ extension ViewController: CellActionsProtocol {
     }
 }
 
+// MARK: - Like Animation
+extension ViewController {
+    
+    func panActionDidStart(on likeButton: UIButton) {
+        // 1. Convert like button frame from cell coordinate system to view controller coordinate system
+        guard let convertedLikeFrame = likeButton.superview?.convert(likeButton.frame, to: view) else { return }
+        // 2. Create copy of the like button
+        copiedLikeButton = UIButton(frame: convertedLikeFrame)
+        // 3. Copy imageEdgeInsets of the button
+        copiedLikeButton?.imageEdgeInsets = likeButton.imageEdgeInsets
+        // 4. Set image to the copy button
+        copiedLikeButton?.setImage(likeButton.image(for: .normal), for: .normal)
+        // 5. Add copy button to view controller
+        self.view.addSubview(copiedLikeButton!)
+        // 6. After that hide initial like button
+        likeButton.isHidden = true
+    }
+    
+    func panActionDidMove(_ likeButton: UIButton, to position: CGPoint, target: UIImageView) {
+        // 1. Make sure that we have copy button and convert new position of the like button from cell coordinate system to view controller coordinate system
+        guard let copiedLikeButton = copiedLikeButton,
+            let convertedPosition = likeButton.superview?.convert(position, to: self.view) else { return }
+        // 2. Set new coordinates
+        copiedLikeButton.center = convertedPosition
+    }
+
+    func panActionDidStop(on likeButton: UIButton, target: UIImageView, at row: Int) {
+        guard copiedLikeButton != nil else { return }
+        let dragAnimator = UIViewPropertyAnimator(duration: animationDuration, curve: .easeInOut, animations: nil)
+        var targetCenter: CGPoint?
+        if dragLikeCompletionPercent < 0.5 {
+            targetCenter = likeButton.superview?.convert(likeButton.center, to: view)
+            dragAnimator.addCompletion { (_) in
+                likeButton.isHidden = false
+                self.copiedLikeButton?.removeFromSuperview()
+                self.copiedLikeButton = nil
+            }
+        } else {
+            targetCenter = target.superview?.convert(target.center, to: view)
+            dragAnimator.addCompletion { (_) in
+                self.performLikeAnimation(initialLikeButton: likeButton)
+                self.tableViewDataSource.posts[row].isLiked = true
+            }
+        }
+        guard let targetPoint = targetCenter else { return }
+        dragAnimator.addAnimations {
+            self.copiedLikeButton?.center = targetPoint
+        }
+        dragAnimator.startAnimation()
+    }
+
+    func performLikeAnimation(initialLikeButton: UIButton) {
+        guard copiedLikeButton != nil else { return }
+        let likeAnimator = UIViewPropertyAnimator(duration: animationDuration, curve: .easeInOut, animations: nil)
+        initialLikeButton.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
+        initialLikeButton.isHidden = false
+        initialLikeButton.setImage(#imageLiteral(resourceName: "LikeButtonActivated.png"), for: .normal)
+        likeAnimator.addAnimations {
+            self.copiedLikeButton?.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
+            initialLikeButton.transform = CGAffineTransform.identity
+        }
+        likeAnimator.addCompletion { (_) in
+            self.copiedLikeButton?.removeFromSuperview()
+            self.copiedLikeButton = nil
+        }
+        likeAnimator.startAnimation()
+    }
+}
 
 
